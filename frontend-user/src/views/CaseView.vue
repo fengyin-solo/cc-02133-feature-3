@@ -7,73 +7,125 @@
         <p class="page-subtitle">众多企业的信赖之选，见证智慧物流的力量</p>
       </div>
     </section>
-    
-    <!-- 筛选标签 -->
+
+    <!-- 搜索与筛选 -->
     <section class="filter-section">
       <div class="container">
-        <div class="filter-tags">
-          <el-button 
-            v-for="tag in tags" 
-            :key="tag.value"
-            :type="activeTag === tag.value ? 'primary' : ''"
-            round
-            @click="activeTag = tag.value"
+        <div class="search-bar">
+          <el-input
+            v-model="keywordInput"
+            class="case-search"
+            placeholder="搜索案例关键词，如：电商、仓储、成本"
+            clearable
+            :prefix-icon="Search"
+          />
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">行业类型</span>
+          <div class="filter-tags">
+            <el-button
+              v-for="tag in tagsWithCount"
+              :key="tag.value"
+              :type="activeTag === tag.value ? 'primary' : ''"
+              round
+              @click="activeTag = tag.value"
+            >
+              {{ tag.label }}（{{ tag.count }}）
+            </el-button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">实施效果</span>
+          <el-checkbox-group v-model="activeEffects" class="effect-group">
+            <el-checkbox-button
+              v-for="dim in effectDimensions"
+              :key="dim.value"
+              :value="dim.value"
+            >
+              {{ dim.label }}
+            </el-checkbox-button>
+          </el-checkbox-group>
+          <el-button
+            v-if="hasConditions"
+            link
+            type="primary"
+            class="reset-btn"
+            @click="resetFilters"
           >
-            {{ tag.label }}
+            清空条件
           </el-button>
         </div>
       </div>
     </section>
-    
+
     <!-- 案例列表 -->
     <section class="section section-gray">
       <div class="container">
-        <div class="case-grid">
-          <div 
-            class="case-detail-card" 
-            v-for="caseItem in filteredCases" 
-            :key="caseItem.title"
-          >
-            <div class="case-header" :style="{ background: caseItem.gradient }">
-              <div class="case-logo">
-                <el-icon :size="48"><OfficeBuilding /></el-icon>
+        <template v-if="filteredCases.length">
+          <div class="result-bar">
+            共找到 <strong>{{ filteredCases.length }}</strong> 个符合条件的案例
+          </div>
+          <div class="case-grid">
+            <div
+              class="case-detail-card"
+              v-for="caseItem in filteredCases"
+              :key="caseItem.id"
+            >
+              <div class="case-header" :style="{ background: caseItem.gradient }">
+                <div class="case-logo">
+                  <el-icon :size="48"><OfficeBuilding /></el-icon>
+                </div>
+                <div class="case-tag">{{ caseItem.industry }}</div>
               </div>
-              <div class="case-tag">{{ caseItem.industry }}</div>
-            </div>
-            <div class="case-body">
-              <h3 class="case-title">{{ caseItem.title }}</h3>
-              <p class="case-desc">{{ caseItem.description }}</p>
-              
-              <div class="case-challenge">
-                <h4><el-icon><Warning /></el-icon> 面临挑战</h4>
-                <p>{{ caseItem.challenge }}</p>
-              </div>
-              
-              <div class="case-solution">
-                <h4><el-icon><Checked /></el-icon> 解决方案</h4>
-                <p>{{ caseItem.solution }}</p>
-              </div>
-              
-              <div class="case-results">
-                <h4>实施效果</h4>
-                <div class="result-items">
-                  <div class="result-item" v-for="result in caseItem.results" :key="result.label">
-                    <span class="result-value">{{ result.value }}</span>
-                    <span class="result-label">{{ result.label }}</span>
+              <div class="case-body">
+                <h3 class="case-title">{{ caseItem.title }}</h3>
+                <p class="case-desc">{{ caseItem.description }}</p>
+
+                <div class="case-challenge">
+                  <h4><el-icon><Warning /></el-icon> 面临挑战</h4>
+                  <p>{{ caseItem.challenge }}</p>
+                </div>
+
+                <div class="case-solution">
+                  <h4><el-icon><Checked /></el-icon> 解决方案</h4>
+                  <p>{{ caseItem.solution }}</p>
+                </div>
+
+                <div class="case-results">
+                  <h4>实施效果</h4>
+                  <div class="result-items">
+                    <div class="result-item" v-for="result in caseItem.results" :key="result.label">
+                      <span class="result-value">{{ result.value }}</span>
+                      <span class="result-label">{{ result.label }}</span>
+                    </div>
                   </div>
+                </div>
+
+                <div class="case-footer">
+                  <el-button type="primary" plain round @click="goConsult(caseItem)">
+                    意向咨询
+                    <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+                  </el-button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </template>
+        <el-empty
+          v-else
+          class="case-empty"
+          description="未找到符合条件的案例，请调整搜索或筛选条件"
+        >
+          <el-button type="primary" round @click="resetFilters">清空筛选条件</el-button>
+        </el-empty>
       </div>
     </section>
-    
+
     <!-- 客户评价 -->
     <section class="section section-light">
       <div class="container">
-        <SectionTitle 
-          title="客户评价" 
+        <SectionTitle
+          title="客户评价"
           subtitle="听听他们怎么说"
         />
         <div class="testimonial-grid">
@@ -95,7 +147,7 @@
         </div>
       </div>
     </section>
-    
+
     <!-- CTA -->
     <section class="section cta-section">
       <div class="container text-center">
@@ -111,112 +163,101 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Search } from '@element-plus/icons-vue'
 import SectionTitle from '@/components/SectionTitle.vue'
+import { industryTags, effectDimensions, filterCases, countCasesByTag } from '@/data/cases'
 
-const activeTag = ref('all')
+const route = useRoute()
+const router = useRouter()
 
-const tags = [
-  { label: '全部案例', value: 'all' },
-  { label: '电商物流', value: 'ecommerce' },
-  { label: '快递物流', value: 'express' },
-  { label: '零售配送', value: 'retail' },
-  { label: '制造业', value: 'manufacturing' }
-]
+const validTags = industryTags.map(t => t.value)
+const validEffects = effectDimensions.map(e => e.value)
 
-const cases = [
-  {
-    title: '某大型电商平台',
-    industry: '电商物流',
-    tag: 'ecommerce',
-    description: '国内领先的综合电商平台，日均订单量超过500万单',
-    challenge: '仓库作业效率低下，库存准确率不足95%，大促期间频繁出现爆仓情况',
-    solution: '部署知运智慧仓储系统，实现库位智能分配、拣货路径优化、库存实时监控',
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    results: [
-      { value: '40%', label: '效率提升' },
-      { value: '99.9%', label: '库存准确率' },
-      { value: '30%', label: '成本降低' }
-    ]
-  },
-  {
-    title: '某知名快递企业',
-    industry: '快递物流',
-    tag: 'express',
-    description: '全国性快递服务商，网点覆盖全国300+城市',
-    challenge: '运输成本居高不下，车辆利用率低，运输时效难以保障',
-    solution: '采用知运运输管理系统，实现智能路径规划、运力资源整合、全程可视追踪',
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    results: [
-      { value: '25%', label: '成本降低' },
-      { value: '20%', label: '时效提升' },
-      { value: '35%', label: '车辆利用率提升' }
-    ]
-  },
-  {
-    title: '某连锁零售集团',
-    industry: '零售配送',
-    tag: 'retail',
-    description: '拥有2000+门店的连锁零售企业，覆盖华南地区',
-    challenge: '门店配送准时率低，客户投诉多，配送成本高',
-    solution: '使用知运配送调度系统，实现智能派单、路线优化、电子签收',
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    results: [
-      { value: '98%', label: '准时率' },
-      { value: '50%', label: '投诉减少' },
-      { value: '20%', label: '成本降低' }
-    ]
-  },
-  {
-    title: '某汽车零部件制造商',
-    industry: '制造业',
-    tag: 'manufacturing',
-    description: '国内知名汽车零部件供应商，服务多家主机厂',
-    challenge: '供应链协同困难，库存周转慢，无法满足JIT配送要求',
-    solution: '部署知运全套物流系统，实现供应链可视化、库存精准管控、准时配送',
-    gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    results: [
-      { value: '99.5%', label: '准时交付率' },
-      { value: '40%', label: '库存周转提升' },
-      { value: '15%', label: '运营成本降低' }
-    ]
-  },
-  {
-    title: '某生鲜电商平台',
-    industry: '电商物流',
-    tag: 'ecommerce',
-    description: '专注生鲜配送的电商平台，主打2小时达服务',
-    challenge: '生鲜损耗率高，配送时效难以保障，冷链管理困难',
-    solution: '定制化冷链物流解决方案，实现温度全程监控、智能调度、损耗预警',
-    gradient: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-    results: [
-      { value: '60%', label: '损耗降低' },
-      { value: '95%', label: '2小时达成率' },
-      { value: '25%', label: '成本优化' }
-    ]
-  },
-  {
-    title: '某医药流通企业',
-    industry: '制造业',
-    tag: 'manufacturing',
-    description: '华南地区领先的医药流通企业，服务5000+医疗机构',
-    challenge: '药品追溯要求严格，效期管理复杂，合规风险高',
-    solution: '部署符合GSP要求的仓储系统，实现全程追溯、效期预警、合规管理',
-    gradient: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
-    results: [
-      { value: '100%', label: '追溯覆盖率' },
-      { value: '0', label: '合规问题' },
-      { value: '30%', label: '效率提升' }
-    ]
-  }
-]
+// 从 URL query 解析筛选状态（非法值回退默认，保证状态稳定）
+const parseQuery = (query) => {
+  const keyword = typeof query.keyword === 'string' ? query.keyword.trim().slice(0, 50) : ''
+  const tag = validTags.includes(query.tag) ? query.tag : 'all'
+  const rawEffects = typeof query.effects === 'string' ? query.effects.split(',') : []
+  // 按固定顺序输出，保证 URL 与状态比较时稳定
+  const effects = validEffects.filter(value => rawEffects.includes(value))
+  return { keyword, tag, effects }
+}
 
-const filteredCases = computed(() => {
-  if (activeTag.value === 'all') {
-    return cases
-  }
-  return cases.filter(c => c.tag === activeTag.value)
+const initialState = parseQuery(route.query)
+
+const keywordInput = ref(initialState.keyword) // 输入框即时值
+const keyword = ref(initialState.keyword)      // 防抖后生效的搜索词
+const activeTag = ref(initialState.tag)
+const activeEffects = ref(initialState.effects)
+
+// 关键词防抖，避免快速连续输入时列表频繁抖动
+let debounceTimer = null
+watch(keywordInput, (val) => {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    keyword.value = val.trim()
+  }, 300)
 })
+
+onBeforeUnmount(() => clearTimeout(debounceTimer))
+
+const filteredCases = computed(() => filterCases({
+  keyword: keyword.value,
+  tag: activeTag.value,
+  effects: activeEffects.value
+}))
+
+const tagsWithCount = computed(() => industryTags.map(tag => ({
+  ...tag,
+  count: countCasesByTag(tag.value)
+})))
+
+const hasConditions = computed(() =>
+  Boolean(keywordInput.value) || activeTag.value !== 'all' || activeEffects.value.length > 0
+)
+
+const resetFilters = () => {
+  keywordInput.value = ''
+  keyword.value = ''
+  activeTag.value = 'all'
+  activeEffects.value = []
+}
+
+const sameEffects = (a, b) => a.length === b.length && [...a].sort().join(',') === [...b].sort().join(',')
+
+// 筛选状态变化时同步到 URL（replace 不污染历史记录，便于返回时还原）
+watch([keyword, activeTag, activeEffects], () => {
+  const current = parseQuery(route.query)
+  if (
+    current.keyword === keyword.value &&
+    current.tag === activeTag.value &&
+    sameEffects(current.effects, activeEffects.value)
+  ) {
+    return
+  }
+  const query = {}
+  if (keyword.value) query.keyword = keyword.value
+  if (activeTag.value !== 'all') query.tag = activeTag.value
+  if (activeEffects.value.length) query.effects = validEffects.filter(v => activeEffects.value.includes(v)).join(',')
+  router.replace({ query }).catch(() => {})
+})
+
+// URL 变化（如从咨询页返回、浏览器前进后退）时还原搜索与筛选
+watch(() => route.query, (query) => {
+  const parsed = parseQuery(query)
+  if (parsed.keyword !== keyword.value) {
+    keywordInput.value = parsed.keyword
+    keyword.value = parsed.keyword
+  }
+  activeTag.value = parsed.tag
+  activeEffects.value = parsed.effects
+})
+
+const goConsult = (caseItem) => {
+  router.push({ path: '/contact', query: { case: caseItem.title } })
+}
 
 const testimonials = [
   {
@@ -264,11 +305,65 @@ const testimonials = [
   border-bottom: 1px solid $border-light;
 }
 
+.search-bar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: $spacing-md;
+}
+
+.case-search {
+  max-width: 480px;
+  width: 100%;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+  justify-content: center;
+
+  & + .filter-row {
+    margin-top: $spacing-md;
+  }
+}
+
+.filter-label {
+  font-size: $font-size-sm;
+  color: $text-secondary;
+  flex-shrink: 0;
+}
+
 .filter-tags {
   display: flex;
   gap: $spacing-sm;
   flex-wrap: wrap;
   justify-content: center;
+
+  .el-button {
+    margin-left: 0;
+  }
+}
+
+.effect-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.reset-btn {
+  flex-shrink: 0;
+}
+
+.result-bar {
+  font-size: $font-size-sm;
+  color: $text-secondary;
+  margin-bottom: $spacing-lg;
+
+  strong {
+    color: $primary-color;
+    font-size: $font-size-base;
+  }
 }
 
 .case-grid {
@@ -283,7 +378,7 @@ const testimonials = [
   overflow: hidden;
   box-shadow: $shadow-md;
   transition: all 0.3s;
-  
+
   &:hover {
     transform: translateY(-8px);
     box-shadow: $shadow-lg;
@@ -341,7 +436,7 @@ const testimonials = [
 .case-challenge,
 .case-solution {
   margin-bottom: $spacing-md;
-  
+
   h4 {
     display: flex;
     align-items: center;
@@ -349,12 +444,12 @@ const testimonials = [
     font-size: $font-size-sm;
     color: $text-primary;
     margin-bottom: $spacing-xs;
-    
+
     .el-icon {
       color: $warning-color;
     }
   }
-  
+
   p {
     font-size: $font-size-sm;
     color: $text-secondary;
@@ -368,9 +463,9 @@ const testimonials = [
 
 .case-results {
   background: $bg-color;
-  margin: 0 (-$spacing-lg) (-$spacing-lg);
+  margin: 0 (-$spacing-lg);
   padding: $spacing-md $spacing-lg;
-  
+
   h4 {
     font-size: $font-size-sm;
     color: $text-primary;
@@ -385,18 +480,27 @@ const testimonials = [
 
 .result-item {
   text-align: center;
-  
+
   .result-value {
     display: block;
     font-size: $font-size-xl;
     font-weight: 700;
     color: $primary-color;
   }
-  
+
   .result-label {
     font-size: $font-size-xs;
     color: $text-secondary;
   }
+}
+
+.case-footer {
+  padding-top: $spacing-md;
+  text-align: right;
+}
+
+.case-empty {
+  padding: $spacing-xxl 0;
 }
 
 .testimonial-grid {
@@ -447,7 +551,7 @@ const testimonials = [
     font-size: $font-size-base;
     color: $text-primary;
   }
-  
+
   p {
     font-size: $font-size-sm;
     color: $text-secondary;
@@ -475,7 +579,7 @@ const testimonials = [
   .case-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .testimonial-grid {
     grid-template-columns: 1fr;
   }
@@ -485,7 +589,7 @@ const testimonials = [
   .page-title {
     font-size: $font-size-xxl;
   }
-  
+
   .result-items {
     flex-wrap: wrap;
   }

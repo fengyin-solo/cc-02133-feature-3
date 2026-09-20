@@ -179,9 +179,12 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import SectionTitle from '@/components/SectionTitle.vue'
+
+const route = useRoute()
 
 const formRef = ref(null)
 const submitting = ref(false)
@@ -193,6 +196,13 @@ const form = reactive({
   email: '',
   company: '',
   message: ''
+})
+
+// 从案例页「意向咨询」进入时，预填咨询内容
+onMounted(() => {
+  if (typeof route.query.case === 'string' && route.query.case) {
+    form.message = `您好，我对贵司的「${route.query.case}」案例很感兴趣，希望咨询类似的解决方案。`
+  }
 })
 
 const rules = {
