@@ -7,32 +7,89 @@
         <p class="page-subtitle">众多企业的信赖之选，见证智慧物流的力量</p>
       </div>
     </section>
-    
-    <!-- 筛选标签 -->
+
+    <!-- 检索与筛选 -->
     <section class="filter-section">
       <div class="container">
-        <div class="filter-tags">
-          <el-button 
-            v-for="tag in tags" 
-            :key="tag.value"
-            :type="activeTag === tag.value ? 'primary' : ''"
-            round
-            @click="activeTag = tag.value"
+        <!-- 关键词搜索 -->
+        <div class="search-bar">
+          <el-input
+            v-model="keyword"
+            placeholder="搜索行业、企业名称、挑战或解决方案关键词"
+            clearable
+            size="large"
+            :prefix-icon="Search"
+            @input="scheduleQueryUpdate"
+            @clear="scheduleQueryUpdate"
+            @keyup.enter="flushQueryUpdate"
+          />
+        </div>
+
+        <!-- 行业筛选 -->
+        <div class="filter-row">
+          <span class="filter-label">行业：</span>
+          <div class="filter-tags">
+            <el-button
+              v-for="tag in industryTags"
+              :key="tag.value"
+              :type="activeIndustry === tag.value ? 'primary' : ''"
+              round
+              @click="setIndustry(tag.value)"
+            >
+              {{ tag.label }}
+              <span class="tag-count">{{ getIndustryCount(tag.value) }}</span>
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 实施效果筛选 -->
+        <div class="filter-row">
+          <span class="filter-label">实施效果：</span>
+          <div class="filter-tags">
+            <el-button
+              v-for="effect in effectFilters"
+              :key="effect.value"
+              :type="activeEffects.includes(effect.value) ? 'primary' : ''"
+              round
+              @click="toggleEffect(effect.value)"
+            >
+              {{ effect.label }}
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 当前条件与清空 -->
+        <div class="filter-summary">
+          <span>共找到 <strong>{{ filteredCases.length }}</strong> 个相关案例</span>
+          <el-button
+            v-if="hasActiveFilters"
+            type="primary"
+            link
+            :icon="RefreshLeft"
+            @click="clearAllFilters"
           >
-            {{ tag.label }}
+            清空筛选条件
           </el-button>
         </div>
       </div>
     </section>
-    
+
     <!-- 案例列表 -->
     <section class="section section-gray">
       <div class="container">
-        <div class="case-grid">
-          <div 
-            class="case-detail-card" 
-            v-for="caseItem in filteredCases" 
-            :key="caseItem.title"
+        <!-- 无结果状态 -->
+        <div v-if="filteredCases.length === 0" class="empty-state">
+          <el-icon :size="56"><Search /></el-icon>
+          <h3>未找到匹配的成功案例</h3>
+          <p>当前行业、实施效果或关键词组合下暂无案例，请尝试调整筛选条件</p>
+          <el-button type="primary" round @click="clearAllFilters">清空条件，查看全部案例</el-button>
+        </div>
+
+        <div v-else class="case-grid">
+          <div
+            class="case-detail-card"
+            v-for="caseItem in filteredCases"
+            :key="caseItem.id"
           >
             <div class="case-header" :style="{ background: caseItem.gradient }">
               <div class="case-logo">
@@ -43,17 +100,17 @@
             <div class="case-body">
               <h3 class="case-title">{{ caseItem.title }}</h3>
               <p class="case-desc">{{ caseItem.description }}</p>
-              
+
               <div class="case-challenge">
                 <h4><el-icon><Warning /></el-icon> 面临挑战</h4>
                 <p>{{ caseItem.challenge }}</p>
               </div>
-              
+
               <div class="case-solution">
                 <h4><el-icon><Checked /></el-icon> 解决方案</h4>
                 <p>{{ caseItem.solution }}</p>
               </div>
-              
+
               <div class="case-results">
                 <h4>实施效果</h4>
                 <div class="result-items">
@@ -63,17 +120,29 @@
                   </div>
                 </div>
               </div>
+
+              <div class="case-actions">
+                <el-button
+                  type="primary"
+                  plain
+                  round
+                  @click="goToConsult(caseItem)"
+                >
+                  <el-icon class="el-icon--left"><ChatLineSquare /></el-icon>
+                  意向咨询
+                </el-button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
-    
+
     <!-- 客户评价 -->
     <section class="section section-light">
       <div class="container">
-        <SectionTitle 
-          title="客户评价" 
+        <SectionTitle
+          title="客户评价"
           subtitle="听听他们怎么说"
         />
         <div class="testimonial-grid">
@@ -95,13 +164,18 @@
         </div>
       </div>
     </section>
-    
+
     <!-- CTA -->
     <section class="section cta-section">
       <div class="container text-center">
         <h2 class="cta-title">想成为下一个成功案例？</h2>
         <p class="cta-desc">联系我们，开启您的智慧物流之旅</p>
-        <el-button type="primary" size="large" round @click="$router.push('/contact')">
+        <el-button
+          type="primary"
+          size="large"
+          round
+          @click="goToConsult()"
+        >
           立即咨询
           <el-icon class="el-icon--right"><ArrowRight /></el-icon>
         </el-button>
@@ -111,112 +185,170 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Search, RefreshLeft, ChatLineSquare } from '@element-plus/icons-vue'
 import SectionTitle from '@/components/SectionTitle.vue'
+import {
+  cases,
+  INDUSTRY_TAGS,
+  EFFECT_FILTERS,
+  getIndustryCount
+} from '@/data/cases.js'
 
-const activeTag = ref('all')
+const route = useRoute()
+const router = useRouter()
 
-const tags = [
-  { label: '全部案例', value: 'all' },
-  { label: '电商物流', value: 'ecommerce' },
-  { label: '快递物流', value: 'express' },
-  { label: '零售配送', value: 'retail' },
-  { label: '制造业', value: 'manufacturing' }
-]
+const industryTags = INDUSTRY_TAGS
+const effectFilters = EFFECT_FILTERS
 
-const cases = [
-  {
-    title: '某大型电商平台',
-    industry: '电商物流',
-    tag: 'ecommerce',
-    description: '国内领先的综合电商平台，日均订单量超过500万单',
-    challenge: '仓库作业效率低下，库存准确率不足95%，大促期间频繁出现爆仓情况',
-    solution: '部署知运智慧仓储系统，实现库位智能分配、拣货路径优化、库存实时监控',
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    results: [
-      { value: '40%', label: '效率提升' },
-      { value: '99.9%', label: '库存准确率' },
-      { value: '30%', label: '成本降低' }
-    ]
-  },
-  {
-    title: '某知名快递企业',
-    industry: '快递物流',
-    tag: 'express',
-    description: '全国性快递服务商，网点覆盖全国300+城市',
-    challenge: '运输成本居高不下，车辆利用率低，运输时效难以保障',
-    solution: '采用知运运输管理系统，实现智能路径规划、运力资源整合、全程可视追踪',
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    results: [
-      { value: '25%', label: '成本降低' },
-      { value: '20%', label: '时效提升' },
-      { value: '35%', label: '车辆利用率提升' }
-    ]
-  },
-  {
-    title: '某连锁零售集团',
-    industry: '零售配送',
-    tag: 'retail',
-    description: '拥有2000+门店的连锁零售企业，覆盖华南地区',
-    challenge: '门店配送准时率低，客户投诉多，配送成本高',
-    solution: '使用知运配送调度系统，实现智能派单、路线优化、电子签收',
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    results: [
-      { value: '98%', label: '准时率' },
-      { value: '50%', label: '投诉减少' },
-      { value: '20%', label: '成本降低' }
-    ]
-  },
-  {
-    title: '某汽车零部件制造商',
-    industry: '制造业',
-    tag: 'manufacturing',
-    description: '国内知名汽车零部件供应商，服务多家主机厂',
-    challenge: '供应链协同困难，库存周转慢，无法满足JIT配送要求',
-    solution: '部署知运全套物流系统，实现供应链可视化、库存精准管控、准时配送',
-    gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    results: [
-      { value: '99.5%', label: '准时交付率' },
-      { value: '40%', label: '库存周转提升' },
-      { value: '15%', label: '运营成本降低' }
-    ]
-  },
-  {
-    title: '某生鲜电商平台',
-    industry: '电商物流',
-    tag: 'ecommerce',
-    description: '专注生鲜配送的电商平台，主打2小时达服务',
-    challenge: '生鲜损耗率高，配送时效难以保障，冷链管理困难',
-    solution: '定制化冷链物流解决方案，实现温度全程监控、智能调度、损耗预警',
-    gradient: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-    results: [
-      { value: '60%', label: '损耗降低' },
-      { value: '95%', label: '2小时达成率' },
-      { value: '25%', label: '成本优化' }
-    ]
-  },
-  {
-    title: '某医药流通企业',
-    industry: '制造业',
-    tag: 'manufacturing',
-    description: '华南地区领先的医药流通企业，服务5000+医疗机构',
-    challenge: '药品追溯要求严格，效期管理复杂，合规风险高',
-    solution: '部署符合GSP要求的仓储系统，实现全程追溯、效期预警、合规管理',
-    gradient: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
-    results: [
-      { value: '100%', label: '追溯覆盖率' },
-      { value: '0', label: '合规问题' },
-      { value: '30%', label: '效率提升' }
-    ]
-  }
-]
+const validIndustryValues = INDUSTRY_TAGS.map(t => t.value)
+const validEffectValues = EFFECT_FILTERS.map(e => e.value)
 
+// 解析路由中的搜索与筛选条件（非法值安全回退到默认状态）
+const parseQuery = (query) => {
+  const industry = validIndustryValues.includes(query.industry)
+    ? query.industry
+    : 'all'
+  const rawEffects = query.effects ? String(query.effects).split(',') : []
+  const effects = [...new Set(rawEffects.filter(v => validEffectValues.includes(v)))]
+  const kw = typeof query.q === 'string' ? query.q : ''
+  return { industry, effects, keyword: kw }
+}
+
+// 本地条件为唯一数据源，路由 query 仅作为可分享/可还原的镜像
+const initial = parseQuery(route.query)
+const activeIndustry = ref(initial.industry)
+const activeEffects = ref(initial.effects)
+const keyword = ref(initial.keyword)
+
+const hasActiveFilters = computed(() =>
+  activeIndustry.value !== 'all' ||
+  activeEffects.value.length > 0 ||
+  keyword.value.trim() !== ''
+)
+
+// 组合筛选：行业（AND）+ 实施效果（多选 OR）+ 关键词全文匹配（AND）
 const filteredCases = computed(() => {
-  if (activeTag.value === 'all') {
-    return cases
-  }
-  return cases.filter(c => c.tag === activeTag.value)
+  const kw = keyword.value.trim().toLowerCase()
+  return cases.filter(c => {
+    if (activeIndustry.value !== 'all' && c.tag !== activeIndustry.value) {
+      return false
+    }
+    if (
+      activeEffects.value.length > 0 &&
+      !activeEffects.value.some(e => c.effects.includes(e))
+    ) {
+      return false
+    }
+    if (kw) {
+      const haystack = [
+        c.title,
+        c.industry,
+        c.description,
+        c.challenge,
+        c.solution
+      ].join(' ').toLowerCase()
+      if (!haystack.includes(kw)) {
+        return false
+      }
+    }
+    return true
+  })
 })
+
+// 外部路由变化（浏览器前进/后退、从意向咨询返回）时还原本地条件
+watch(
+  () => [route.query.industry, route.query.effects, route.query.q],
+  () => {
+    const parsed = parseQuery(route.query)
+    if (parsed.industry !== activeIndustry.value) {
+      activeIndustry.value = parsed.industry
+    }
+    const sameEffects =
+      parsed.effects.length === activeEffects.value.length &&
+      parsed.effects.every((v, i) => v === activeEffects.value[i])
+    if (!sameEffects) {
+      activeEffects.value = parsed.effects
+    }
+    if (parsed.keyword !== keyword.value.trim()) {
+      keyword.value = parsed.keyword
+    }
+  }
+)
+
+// 将本地条件整体写回路由（replace 不污染历史；状态取自本地，快速连续切换不丢条件）
+const syncToRoute = () => {
+  const cleaned = {}
+  if (activeIndustry.value !== 'all') cleaned.industry = activeIndustry.value
+  if (activeEffects.value.length) cleaned.effects = activeEffects.value.join(',')
+  const kw = keyword.value.trim()
+  if (kw) cleaned.q = kw
+
+  const same =
+    (route.query.industry || '') === (cleaned.industry || '') &&
+    (route.query.effects || '') === (cleaned.effects || '') &&
+    (route.query.q || '') === (cleaned.q || '')
+  if (same) return
+
+  router.replace({ path: '/cases', query: cleaned }).catch(() => {})
+}
+
+const setIndustry = (value) => {
+  activeIndustry.value = value
+  syncToRoute()
+}
+
+const toggleEffect = (value) => {
+  if (activeEffects.value.includes(value)) {
+    activeEffects.value = activeEffects.value.filter(v => v !== value)
+  } else {
+    activeEffects.value = [...activeEffects.value, value]
+  }
+  syncToRoute()
+}
+
+const clearAllFilters = () => {
+  keyword.value = ''
+  activeIndustry.value = 'all'
+  activeEffects.value = []
+  syncToRoute()
+}
+
+// 关键词防抖，应对快速连续输入
+let debounceTimer = null
+const scheduleQueryUpdate = () => {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(syncToRoute, 300)
+}
+const flushQueryUpdate = () => {
+  clearTimeout(debounceTimer)
+  syncToRoute()
+}
+
+onBeforeUnmount(() => {
+  clearTimeout(debounceTimer)
+})
+
+// 进入意向咨询，携带返回地址（含当前搜索与筛选）与案例标识
+const buildCasesPath = () => {
+  const params = []
+  if (activeIndustry.value !== 'all') {
+    params.push(`industry=${encodeURIComponent(activeIndustry.value)}`)
+  }
+  if (activeEffects.value.length) {
+    params.push(`effects=${encodeURIComponent(activeEffects.value.join(','))}`)
+  }
+  const kw = keyword.value.trim()
+  if (kw) params.push(`q=${encodeURIComponent(kw)}`)
+  return params.length ? `/cases?${params.join('&')}` : '/cases'
+}
+
+const goToConsult = (caseItem = null) => {
+  const query = { from: buildCasesPath() }
+  if (caseItem) query.case = caseItem.id
+  router.push({ path: '/contact', query })
+}
 
 const testimonials = [
   {
@@ -264,11 +396,57 @@ const testimonials = [
   border-bottom: 1px solid $border-light;
 }
 
+.search-bar {
+  max-width: 560px;
+  margin: 0 auto $spacing-lg;
+}
+
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-md;
+  margin-bottom: $spacing-md;
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.filter-label {
+  flex-shrink: 0;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+  line-height: 32px;
+  width: 72px;
+  text-align: right;
+}
+
 .filter-tags {
   display: flex;
   gap: $spacing-sm;
   flex-wrap: wrap;
+}
+
+.tag-count {
+  opacity: 0.75;
+  margin-left: 2px;
+}
+
+.filter-summary {
+  display: flex;
   justify-content: center;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-lg;
+  padding-top: $spacing-md;
+  border-top: 1px dashed $border-light;
+  font-size: $font-size-sm;
+  color: $text-secondary;
+
+  strong {
+    color: $primary-color;
+    font-size: $font-size-base;
+  }
 }
 
 .case-grid {
@@ -277,13 +455,37 @@ const testimonials = [
   gap: $spacing-xl;
 }
 
+.empty-state {
+  background: $bg-white;
+  border-radius: $radius-lg;
+  padding: $spacing-xxl $spacing-lg;
+  text-align: center;
+  color: $text-secondary;
+
+  .el-icon {
+    color: $text-placeholder;
+    margin-bottom: $spacing-md;
+  }
+
+  h3 {
+    font-size: $font-size-lg;
+    color: $text-primary;
+    margin-bottom: $spacing-sm;
+  }
+
+  p {
+    font-size: $font-size-sm;
+    margin-bottom: $spacing-lg;
+  }
+}
+
 .case-detail-card {
   background: $bg-white;
   border-radius: $radius-lg;
   overflow: hidden;
   box-shadow: $shadow-md;
   transition: all 0.3s;
-  
+
   &:hover {
     transform: translateY(-8px);
     box-shadow: $shadow-lg;
@@ -341,7 +543,7 @@ const testimonials = [
 .case-challenge,
 .case-solution {
   margin-bottom: $spacing-md;
-  
+
   h4 {
     display: flex;
     align-items: center;
@@ -349,12 +551,12 @@ const testimonials = [
     font-size: $font-size-sm;
     color: $text-primary;
     margin-bottom: $spacing-xs;
-    
+
     .el-icon {
       color: $warning-color;
     }
   }
-  
+
   p {
     font-size: $font-size-sm;
     color: $text-secondary;
@@ -370,7 +572,7 @@ const testimonials = [
   background: $bg-color;
   margin: 0 (-$spacing-lg) (-$spacing-lg);
   padding: $spacing-md $spacing-lg;
-  
+
   h4 {
     font-size: $font-size-sm;
     color: $text-primary;
@@ -385,18 +587,23 @@ const testimonials = [
 
 .result-item {
   text-align: center;
-  
+
   .result-value {
     display: block;
     font-size: $font-size-xl;
     font-weight: 700;
     color: $primary-color;
   }
-  
+
   .result-label {
     font-size: $font-size-xs;
     color: $text-secondary;
   }
+}
+
+.case-actions {
+  margin-top: $spacing-md;
+  text-align: right;
 }
 
 .testimonial-grid {
@@ -447,7 +654,7 @@ const testimonials = [
     font-size: $font-size-base;
     color: $text-primary;
   }
-  
+
   p {
     font-size: $font-size-sm;
     color: $text-secondary;
@@ -475,7 +682,7 @@ const testimonials = [
   .case-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .testimonial-grid {
     grid-template-columns: 1fr;
   }
@@ -485,9 +692,20 @@ const testimonials = [
   .page-title {
     font-size: $font-size-xxl;
   }
-  
+
   .result-items {
     flex-wrap: wrap;
+  }
+
+  .filter-row {
+    flex-direction: column;
+    gap: $spacing-sm;
+  }
+
+  .filter-label {
+    width: auto;
+    text-align: left;
+    line-height: 1.4;
   }
 }
 </style>

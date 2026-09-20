@@ -82,8 +82,17 @@
             <div class="form-card">
               <h3>在线留言</h3>
               <p class="form-desc">填写以下表单，我们将尽快与您联系</p>
-              
-              <el-form 
+
+              <!-- 来自成功案例的意向咨询：可一键返回并还原搜索筛选 -->
+              <div v-if="showReturnBar" class="case-return-bar">
+                <el-icon class="bar-icon"><InfoFilled /></el-icon>
+                <span class="bar-text">{{ returnBarText }}</span>
+                <el-button link type="primary" :icon="Back" @click="goBack">
+                  返回案例
+                </el-button>
+              </div>
+
+              <el-form
                 ref="formRef"
                 :model="form" 
                 :rules="rules" 
@@ -179,20 +188,58 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { InfoFilled, Back } from '@element-plus/icons-vue'
 import SectionTitle from '@/components/SectionTitle.vue'
+import { getCaseById } from '@/data/cases.js'
+
+const route = useRoute()
+const router = useRouter()
 
 const formRef = ref(null)
 const submitting = ref(false)
 const activeFaq = ref([])
+
+// 成功案例意向咨询来源：返回时还原搜索与筛选状态
+const fromPath = computed(() =>
+  typeof route.query.from === 'string' && route.query.from.startsWith('/cases')
+    ? route.query.from
+    : ''
+)
+
+const caseContext = computed(() =>
+  typeof route.query.case === 'string' ? getCaseById(route.query.case) : null
+)
+
+const showReturnBar = computed(() => Boolean(fromPath.value || caseContext.value))
+
+const returnBarText = computed(() =>
+  caseContext.value
+    ? `您正在咨询：${caseContext.value.title}`
+    : '返回可继续查看与筛选成功案例'
+)
+
+const goBack = () => {
+  if (fromPath.value) {
+    // 携带来时的搜索与筛选条件返回
+    router.push(fromPath.value).catch(() => router.push('/cases'))
+  } else {
+    router.push('/cases')
+  }
+}
+
+const defaultMessage = caseContext.value
+  ? `您好，我想咨询「${caseContext.value.title}」的解决方案，希望进一步沟通。`
+  : ''
 
 const form = reactive({
   name: '',
   phone: '',
   email: '',
   company: '',
-  message: ''
+  message: defaultMessage
 })
 
 const rules = {
@@ -385,6 +432,28 @@ const faqs = [
     font-size: $font-size-sm;
     color: $text-secondary;
     margin-bottom: $spacing-lg;
+  }
+}
+
+.case-return-bar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  padding: $spacing-sm $spacing-md;
+  margin-bottom: $spacing-lg;
+  background: rgba($primary-color, 0.08);
+  border: 1px solid rgba($primary-color, 0.25);
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+
+  .bar-icon {
+    color: $primary-color;
+    flex-shrink: 0;
+  }
+
+  .bar-text {
+    flex: 1;
+    color: $text-regular;
   }
 }
 

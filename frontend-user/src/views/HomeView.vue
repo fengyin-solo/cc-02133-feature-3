@@ -69,13 +69,13 @@
           subtitle="众多企业选择知运，实现物流数字化转型"
         />
         <div class="row">
-          <div class="col col-4" v-for="caseItem in cases" :key="caseItem.title">
-            <CaseCard 
+          <div class="col col-4" v-for="caseItem in displayCases" :key="caseItem.id">
+            <CaseCard
               :title="caseItem.title"
-              :description="caseItem.description"
-              :tag="caseItem.tag"
-              :industry="caseItem.industry"
-              @click="$router.push('/cases')"
+              :description="caseItem.summary"
+              :tag="caseItem.industry"
+              :industry="caseItem.scale"
+              @click="handleCaseClick(caseItem.tag)"
             />
           </div>
         </div>
@@ -126,9 +126,21 @@ import SectionTitle from '@/components/SectionTitle.vue'
 import FeatureCard from '@/components/FeatureCard.vue'
 import ProductCard from '@/components/ProductCard.vue'
 import CaseCard from '@/components/CaseCard.vue'
+import { cases as allCases } from '@/data/cases.js'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
+// 首页仅展示前三个案例，行业标签与案例页共用同一数据源，统计口径一致
+const displayCases = allCases.slice(0, 3)
+
+const handleCaseClick = (industryTag) => {
+  if (industryTag) {
+    router.push({ path: '/cases', query: { industry: industryTag } })
+  } else {
+    router.push('/cases')
+  }
+}
 
 const handleProductDetail = (productId) => {
   if (productId) {
@@ -190,27 +202,6 @@ const stats = [
   { icon: 'Goods', value: '1亿+', label: '日处理订单' },
   { icon: 'TrendCharts', value: '30%', label: '效率提升' },
   { icon: 'Timer', value: '99.9%', label: '系统稳定性' }
-]
-
-const cases = [
-  {
-    title: '某大型电商平台',
-    description: '通过部署知运智慧仓储系统，实现仓库作业效率提升40%，库存准确率达99.9%',
-    tag: '电商物流',
-    industry: '电子商务'
-  },
-  {
-    title: '某知名快递企业',
-    description: '采用知运运输管理系统，优化运输路线，降低运输成本25%，时效提升20%',
-    tag: '快递物流',
-    industry: '快递行业'
-  },
-  {
-    title: '某连锁零售集团',
-    description: '使用知运配送调度系统，实现门店配送准时率提升至98%，客户满意度显著提高',
-    tag: '零售配送',
-    industry: '零售行业'
-  }
 ]
 </script>
 
